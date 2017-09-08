@@ -14,6 +14,7 @@ import os
 import escapism
 import kubespawner
 import oauthenticator
+import ldapauthenticator
 from kubernetes.client.models.v1_volume import V1Volume
 from kubernetes.client.models.v1_volume_mount import V1VolumeMount
 from kubespawner.objects import make_pod
@@ -64,6 +65,12 @@ def _api_headers(access_token):
             "User-Agent": "JupyterHub",
             "Authorization": "token {}".format(access_token)
             }
+
+c.JupyterHub.authenticator_class = 'ldapauthenticator.LDAPAuthenticator'
+c.LDAPAuthenticator.server_address = 'ldap.ncsa.illinois.edu'
+c.LDAPAuthenticator.bind_dn_template = 'uid={username}, ou=People, dc=ncsa, dc=illinois,dc=edu'
+c.LDAPAuthenticator.allowed_groups = [
+    'cn=lsst_users,ou=Groups,dc=ncsa,dc=illinois,dc=edu']
 
 
 # Request additional scope on GitHub token to auto-provision magic in the
