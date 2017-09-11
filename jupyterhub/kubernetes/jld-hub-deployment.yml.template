@@ -12,7 +12,7 @@ spec:
       containers:
         - name: jld-hub
           imagePullPolicy: "Always"
-          image: "lsstsqre/jld-hub"
+          image: "lsstsqre/jld-hub-ncsa"
           resources:
             limits:
               memory: 2G
