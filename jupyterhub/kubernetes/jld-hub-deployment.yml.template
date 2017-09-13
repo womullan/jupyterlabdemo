@@ -15,11 +15,11 @@ spec:
           image: "lsstsqre/jld-hub-ncsa"
           resources:
             limits:
-              memory: 2G
-              cpu: 2.0
+              memory: 4G
+              cpu: 3.0
             requests:
               memory: 1G
-              cpu: 0.8
+              cpu: 1.0
           ports:
             -
               containerPort: 8000

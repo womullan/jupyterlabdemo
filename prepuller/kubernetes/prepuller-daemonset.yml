@@ -49,8 +49,8 @@ spec:
               mountPath: /usr/lib64/libseccomp.so.2
             - name: libseccomp231
               mountPath: /usr/lib64/libseccomp.so.2.3.1
-            # - name: libltdl7
-            #   mountPath: /usr/lib64/libltdl.so.7
+            - name: libltdl7
+              mountPath: /lib64/libltdl.so.7
       volumes:
         - name: dockerdir
           hostPath:
@@ -88,6 +88,6 @@ spec:
         - name: libseccomp231
           hostPath:
             path: /usr/lib64/libseccomp.so.2.3.1
-        # - name: libltdl7
-        #   hostPath:
-        #     path: /usr/lib64/libltdl.so.7
+        - name: libltdl7
+          hostPath:
+            path: /usr/lib64/libltdl.so.7
