@@ -14,7 +14,7 @@ import os
 import escapism
 import kubespawner
 import oauthenticator
-import ldapauthenticator
+#import ldapauthenticator
 from kubernetes.client.models.v1_volume import V1Volume
 from kubernetes.client.models.v1_volume_mount import V1VolumeMount
 from kubespawner.objects import make_pod
@@ -66,101 +66,6 @@ def _api_headers(access_token):
             "Authorization": "token {}".format(access_token)
             }
 
-class NCSALDAPAuthenticator(ldapauthenticator.LDAPAuthenticator):
-
-    @gen.coroutine
-    def pre_spawn_start(self, user, spawner):
-        # First pulls can be really slow for the LSST stack containers,
-        #  so let's give it a big timeout
-        spawner.http_timeout = 60 * 15
-        spawner.start_timeout = 60 * 15
-        # The spawned containers need to be able to talk to the hub through
-        #  the proxy!
-        spawner.hub_connect_port = int(os.environ['JLD_HUB_SERVICE_PORT'])
-        spawner.hub_connect_ip = os.environ['JLD_HUB_SERVICE_HOST']
-        # Set up memory and CPU upper/lower bounds
-        memlim = os.getenv('LAB_MEM_LIMIT')
-        if not memlim:
-            memlim = '2G'
-        memguar = os.getenv('LAB_MEM_GUARANTEE')
-        if not memguar:
-            memguar = '64K'
-        cpulimstr = os.getenv('LAB_CPU_LIMIT')
-        cpulim = 1.0
-        if cpulimstr:
-            cpulim = float(cpulimstr)
-        cpuguar = 0.02
-        cpuguarstr = os.getenv('LAB_CPU_GUARANTEE')
-        if cpuguarstr:
-            cpuguar = float(cpuguarstr)
-        spawner.mem_limit = memlim
-        spawner.cpu_limit = cpulim
-        spawner.mem_guarantee = memguar
-        spawner.cpu_guarantee = cpuguar
-        # Need to figure this out at NCSA.
-        # Persistent shared user volume
-        volname = "jld-fileserver-home"
-        homefound = False
-        for v in spawner.volumes:
-            if v["name"] == volname:
-                homefound = True
-                break
-        if not homefound:
-            spawner.volumes.extend([
-                {"name": volname,
-                 "persistentVolumeClaim":
-                 {"claimName": volname}}])
-            spawner.volume_mounts.extend([
-                {"mountPath": "/home",
-                 "name": volname}])
-        # We are running the Lab at the far end, not the old Notebook
-        spawner.default_url = '/jld/lab'
-        spawner.singleuser_image_pull_policy = 'Always'
-        # Let us set the images from the environment.
-        # Get (possibly list of) image(s)
-        imgspec = os.getenv("LAB_CONTAINER_NAMES")
-        if not imgspec:
-            imgspec = "lsstsqre/jld-lab-ncsa:latest"
-        imagelist = imgspec.split(',')
-        if len(imagelist) < 2:
-            spawner.singleuser_image_spec = imgspec
-        else:
-            spawner.singleuser_image_spec = imagelist[0]
-            spawner.options_form = None
-
-        # Add extra configuration from auth_state
-        if not self.enable_auth_state:
-            return
-        auth_state = yield user.get_auth_state()
-        gh_user = auth_state.get("github_user")
-        gh_token = auth_state.get("access_token")
-        if gh_user:
-            gh_id = gh_user.get("id")
-        gh_org = yield self._get_user_organizations(gh_token)
-        gh_email = gh_user.get("email")
-        if not gh_email:
-            gh_email = yield self._get_user_email(gh_token)
-        if gh_email:
-            spawner.environment['GITHUB_EMAIL'] = gh_email
-        gh_name = gh_user.get("name")
-        if not gh_name:
-            gh_name = gh_user.get("login")
-        if gh_id:
-            spawner.environment['GITHUB_ID'] = str(gh_id)
-        if gh_org:
-            orglstr = ""
-            for k in gh_org:
-                if orglstr:
-                    orglstr += ","
-                orglstr += k + ":" + str(gh_org[k])
-            spawner.environment['GITHUB_ORGANIZATIONS'] = orglstr
-        if gh_name:
-            spawner.environment['GITHUB_NAME'] = gh_name
-        if gh_token:
-            spawner.environment['GITHUB_ACCESS_TOKEN'] = "[secret]"
-            self.log.info("Spawned environment: %s", json.dumps(
-                spawner.environment, sort_keys=True, indent=4))
-            spawner.environment['GITHUB_ACCESS_TOKEN'] = gh_token
 
 #c.JupyterHub.authenticator_class = 'NCSALDAPAuthenticator'
 #c.JupyterHub.authenticator_class = 'ldapauthenticator.LDAPAuthenticator'
@@ -453,7 +358,8 @@ c.LSSTAuth.github_organization_whitelist = set(
     (os.environ['GITHUB_ORGANIZATION_WHITELIST'].split(",")))
 
 # Set options form
-c.LSSTSpawner.options_form = optform
+if optform:
+    c.LSSTSpawner.options_form = optform
 
 
 # Listen to all interfaces
@@ -462,6 +368,7 @@ c.JupyterHub.ip = '0.0.0.0'
 # the hub to be able to restart without losing user containers
 c.JupyterHub.cleanup_servers = False
 # Set Hub IP explicitly
+# Do we need this?
 c.JupyterHub.hub_ip = os.environ['HUB_BIND_IP']
 # Set Session DB URL if we have one
 db_url = os.getenv('SESSION_DB_URL')

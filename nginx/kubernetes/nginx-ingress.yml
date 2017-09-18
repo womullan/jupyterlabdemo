@@ -1,0 +1,15 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+ name: jld
+ annotations:
+   ingress.kubernetes.io/ssl-redirect: "true"
+   ingress.kubernetes.io/proxy-body-size: "8m"
+spec:
+  rules:
+  - http:
+     paths:
+     - path: /jld/
+       backend:
+         serviceName: jld-hub
+         servicePort: 8000
