@@ -64,16 +64,31 @@ spec:
                 secretKeyRef:
                   name: jld-hub
                   key: github_client_id
+            - name: GITHUB_SECONDARY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: jld-hub
+                  key: github_secondary_client_id
             - name: GITHUB_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: jld-hub
                   key: github_secret
+            - name: GITHUB_SECONDARY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jld-hub
+                  key: github_secondary_secret
             - name: OAUTH_CALLBACK_URL
               valueFrom:
                 secretKeyRef:
                   name: jld-hub
                   key: github_oauth_callback_url
+            - name: SECONDARY_OAUTH_CALLBACK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jld-hub
+                  key: github_secondary_callback_url
             # This may contain credentials, so it should be a secret
             - name: SESSION_DB_URL
               valueFrom:

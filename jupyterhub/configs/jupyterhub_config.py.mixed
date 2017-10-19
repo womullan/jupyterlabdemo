@@ -1,8 +1,9 @@
 # This is the JupyterHub configuration file LSST DM-SQuaRE uses for NCSA
-#  CILogon logins.
+#  CILogon logins mixed with GitHub orgs and permissions.
 
 # It spawns JupyterLab containers and does its authentication using
-#  CILogon with the NCSA identity provider.
+#  CILogon with the NCSA identity provider; then it goes to GitHub and gets
+#  user information.
 
 # If it doesn't work for you, replace it in your Kubernetes config.
 # It's mapped in as a configmap.  Look at the deployment file:
@@ -14,11 +15,10 @@ import os
 import escapism
 import kubespawner
 import oauthenticator
-from kubernetes.client.models.v1_volume import V1Volume
-from kubernetes.client.models.v1_volume_mount import V1VolumeMount
 from kubespawner.objects import make_pod
 from tornado import gen
-
+from traitlets import Unicode
+from jupyterhub.utils import url_path_join
 
 # Make options form
 title = os.getenv("LAB_SELECTOR_TITLE")
@@ -51,16 +51,42 @@ for idx, img in enumerate(imagelist):
 # user container.
 
 
-class LSSTLoginHandler(oauthenticator.CILogonLoginHandler):
+def _github_api_headers(access_token):
+    return {"Accept": "application/json",
+            "User-Agent": "JupyterHub",
+            "Authorization": "token {}".format(access_token)
+            }
+
+
+class MixedLoginHandler(oauthenticator.CILogonLoginHandler):
     """Request additional scope on CILogon token.
 
        Set skin to LSST.
 
        Use NCSA as identity provider.
+
+       Go to GitHub for more information.
     """
     scope = ['openid', 'email', 'profile', 'org.cilogon.userinfo']
     skin = "LSST"
     idp = "https://idp.ncsa.illinois.edu/idp/shibboleth"
+
+
+class LSSTSecondaryAuth(oauthenticator.GitHubOAuthenticator):
+    """Secondary Authenticator to pick up GH attributes.
+    """
+    def guess_callback_uri(protocol, host, hub_server_url):
+        callback = os.getenv("SECONDARY_OAUTH_CALLBACK_URL")
+        if not callback:
+            callback = "secondary_oauth_callback"
+        return '{proto}://{host}{path}'.format(
+            proto=protocol,
+            host=host,
+            path=url_path_join(
+                hub_server_url,
+                callback
+            )
+        )
 
 
 # Enable the authenticator to spawn with additional information acquired
@@ -71,7 +97,7 @@ class LSSTAuth(oauthenticator.CILogonOAuthenticator):
     enable_auth_state = True
     _state = None
     _default_domain = "ncsa.illinois.edu"
-    login_handler = LSSTLoginHandler
+    login_handler = MixedLoginHandler
 
     @gen.coroutine
     def authenticate(self, handler, data=None):
@@ -89,6 +115,24 @@ class LSSTAuth(oauthenticator.CILogonOAuthenticator):
                     if domain != self._default_domain:
                         username = username + "." + domain
                 userdict["name"] = username
+        # Now try getting supplementary info from GitHub
+        gh_auth_handler = oauthenticator.GitHubOAuthenticator(
+            client_id_env='GITHUB_SECONDARY_CLIENT_ID',
+            client_secret_env='GITHUB_SECONDARY_CLIENT_SECRET',
+            oauth_callback_url=os.getenv('SECONDARY_OAUTH_CALLBACK_URL'),
+            scope=['public_repo', 'read:org', 'user:email']
+        )
+        ghuserdict = None
+        try:
+            ghuserdict = yield gh_auth_handler.authenticate(gh_auth_handler.login_handler)
+        except Exception as e:
+            self.log.warn("Exception in GitHub authentication: %s" % str(e))
+        if ghuserdict:
+            if "name" in ghuserdict:
+                userdict["github_name"] = ghuserdict["name"]
+            if "auth_state" in ghuserdict:
+                userdict["auth_state"][
+                    "github_user"] = ghuserdict["auth_state"]
         return userdict
 
     @gen.coroutine
