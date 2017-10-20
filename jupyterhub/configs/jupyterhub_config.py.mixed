@@ -17,8 +17,8 @@ import kubespawner
 import oauthenticator
 from kubespawner.objects import make_pod
 from tornado import gen
-from traitlets import Unicode
-from jupyterhub.utils import url_path_join
+from oauthenticator.common import next_page_from_links
+from tornado.httpclient import HTTPRequest, AsyncHTTPClient, HTTPError
 
 # Make options form
 title = os.getenv("LAB_SELECTOR_TITLE")
@@ -72,21 +72,11 @@ class MixedLoginHandler(oauthenticator.CILogonLoginHandler):
     idp = "https://idp.ncsa.illinois.edu/idp/shibboleth"
 
 
-class LSSTSecondaryAuth(oauthenticator.GitHubOAuthenticator):
-    """Secondary Authenticator to pick up GH attributes.
-    """
-    def guess_callback_uri(protocol, host, hub_server_url):
-        callback = os.getenv("SECONDARY_OAUTH_CALLBACK_URL")
-        if not callback:
-            callback = "secondary_oauth_callback"
-        return '{proto}://{host}{path}'.format(
-            proto=protocol,
-            host=host,
-            path=url_path_join(
-                hub_server_url,
-                callback
-            )
-        )
+class LSSTSecondaryLoginHandler(oauthenticator.GitHubLoginHandler):
+    scope = ['public_repo', 'read:org', 'user:email']
+
+# Enable the authenticator to spawn with additional information acquired
+# with token with larger-than-default scope.
 
 
 # Enable the authenticator to spawn with additional information acquired
@@ -116,17 +106,8 @@ class LSSTAuth(oauthenticator.CILogonOAuthenticator):
                         username = username + "." + domain
                 userdict["name"] = username
         # Now try getting supplementary info from GitHub
-        gh_auth_handler = oauthenticator.GitHubOAuthenticator(
-            client_id_env='GITHUB_SECONDARY_CLIENT_ID',
-            client_secret_env='GITHUB_SECONDARY_CLIENT_SECRET',
-            oauth_callback_url=os.getenv('SECONDARY_OAUTH_CALLBACK_URL'),
-            scope=['public_repo', 'read:org', 'user:email']
-        )
-        ghuserdict = None
-        try:
-            ghuserdict = yield gh_auth_handler.authenticate(gh_auth_handler.login_handler)
-        except Exception as e:
-            self.log.warn("Exception in GitHub authentication: %s" % str(e))
+        gh_auth_handler = LSSTSecondaryAuth()
+        ghuserdict = yield gh_auth_handler.authenticate(gh_auth_handler.login_handler, data)
         if ghuserdict:
             if "name" in ghuserdict:
                 userdict["github_name"] = ghuserdict["name"]
@@ -212,6 +193,86 @@ class LSSTAuth(oauthenticator.CILogonOAuthenticator):
                     uid = sub.split("/")[-1]  # Last field is UID
                     spawner.environment['EXTERNAL_UID'] = uid
             # Might be nice to have a mixin to also get GitHub information...
+            if "github_user" in auth_state:
+                gh_user = auth_state.get("github_user")
+                gh_token = auth_state.get("access_token")
+            if gh_user:
+                gh_id = gh_user.get("id")
+                gh_org = yield self._get_gh_user_organizations(gh_token)
+                gh_email = gh_user.get("email")
+            if not gh_email:
+                gh_email = yield self._get_gh_user_email(gh_token)
+            if gh_email:
+                spawner.environment['GITHUB_EMAIL'] = gh_email
+            gh_name = gh_user.get("name")
+            if not gh_name:
+                gh_name = gh_user.get("login")
+            if gh_id:
+                spawner.environment['GITHUB_ID'] = str(gh_id)
+            if gh_org:
+                orglstr = ""
+                for k in gh_org:
+                    if orglstr:
+                        orglstr += ","
+                        orglstr += k + ":" + str(gh_org[k])
+                spawner.environment['GITHUB_GROUPS'] = orglstr
+            if gh_name:
+                spawner.environment['GITHUB_NAME'] = gh_name
+            if gh_token:
+                spawner.environment['GITHUB_ACCESS_TOKEN'] = gh_token
+
+    @gen.coroutine
+    def _get_gh_user_organizations(self, access_token):
+        """Get list of orgs user is a member of.  Requires 'read:org'
+        token scope.
+        """
+
+        http_client = AsyncHTTPClient()
+        headers = _github_api_headers(access_token)
+        next_page = "https://%s/user/orgs" % (oauthenticator.GITHUB_API)
+        orgmap = {}
+        while next_page:
+            req = HTTPRequest(next_page, method="GET", headers=headers)
+            try:
+                resp = yield http_client.fetch(req)
+            except HTTPError:
+                return None
+            resp_json = json.loads(resp.body.decode('utf8', 'replace'))
+            next_page = next_page_from_links(resp)
+            for entry in resp_json:
+                # This could result in non-unique groups, if the first 32
+                #  characters of the group names are the same.
+                normalized_group = entry["login"][:32]
+                orgmap[normalized_group] = entry["id"]
+        return orgmap
+
+    @gen.coroutine
+    def _get_gh_user_email(self, access_token):
+        """Determine even private email, if the token has 'user:email'
+        scope."""
+        http_client = AsyncHTTPClient()
+        headers = _api_headers(access_token)
+        next_page = "https://%s/user/emails" % (GITHUB_API)
+        while next_page:
+            req = HTTPRequest(next_page, method="GET", headers=headers)
+            resp = yield http_client.fetch(req)
+            resp_json = json.loads(resp.body.decode('utf8', 'replace'))
+            next_page = next_page_from_links(resp)
+            for entry in resp_json:
+                if "email" in entry:
+                    if "primary" in entry and entry["primary"]:
+                        return entry["email"]
+        return None
+
+
+class LSSTSecondaryAuth(oauthenticator.GitHubOAuthenticator):
+    """Authenticator to use our custom environment settings.
+    """
+    enable_auth_state = True
+
+    _state = None
+
+    login_handler = LSSTSecondaryLoginHandler
 
 
 # Spawn the pod with custom settings retrieved via token additional scope.
@@ -285,9 +346,8 @@ class LSSTSpawner(kubespawner.KubeSpawner):
             fs_gid=singleuser_fs_gid,
             run_privileged=self.singleuser_privileged,
             env=pod_env,
-            volumes=self._expand_all(self.volumes) + [hack_volume],
-            volume_mounts=self._expand_all(
-                self.volume_mounts) + [hack_volume_mount],
+            volumes=self._expand_all(self.volumes),
+            volume_mounts=self._expand_all(self.volume_mounts),
             working_dir=self.singleuser_working_dir,
             labels=labels,
             cpu_limit=self.cpu_limit,
