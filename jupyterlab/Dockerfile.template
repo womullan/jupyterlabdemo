@@ -90,7 +90,7 @@ RUN  mkdir -p /usr/share/git && \
      git clone https://github.com/bokeh/jupyterlab_bokeh.git && \
      mv jupyterlab_bokeh jupyterlab-bokeh && \
      git clone https://github.com/lsst-sqre/jupyterlab-savequit && \
-     for i in savequit bokeh hub; do \
+     for i in savequit bokeh hub github; do \
      	 cd jupyterlab-${i} && \
          python3 /usr/bin/jupyter labextension link . --no-build && \
          npm install --unsafe-perm && \
