@@ -53,7 +53,8 @@ RUN  yum -y install texlive texlive-collection-xetex texlive-ec \
 RUN  pip3 install \
       https://github.com/jupyterlab/jupyterlab/zipball/master \
       https://github.com/jupyter/notebook/zipball/master \
-      https://github.com/jupyterhub/jupyterhub/zipball/master
+      https://github.com/jupyterhub/jupyterhub/zipball/master \
+      https://github.com/lsst-sqre/jupyterlab-github/zipball/tickets/DM-12358
 RUN  git ls-remote https://github.com/jupyterlab/jupyterlab.git master | \
        awk '{print $1}' > /root/jupyterlab.commit
 RUN  pip2 install --upgrade virtualenv virtualenvwrapper pipenv
@@ -73,15 +74,21 @@ RUN  pdir=/opt/lsst/software/stack/python/current/bin && \
 RUN  /opt/lsst/software/stack/python/current/bin/python${PYVER} \
       -m ipykernel install --name 'LSST_Stack'
 RUN  python3 /usr/bin/jupyter serverextension enable --py jupyterlab \
+      --sys-prefix && \
+      python3 /usr/bin/jupyter serverextension enable --py jupyterlab_github  \
       --sys-prefix
 RUN  /opt/lsst/software/stack/python/current/bin/python${PYVER} \
-      /usr/bin/jupyter serverextension enable --py jupyterlab --sys-prefix
+      /usr/bin/jupyter serverextension enable --py jupyterlab --sys-prefix && \
+     /opt/lsst/software/stack/python/current/bin/python${PYVER} \
+     /usr/bin/jupyter serverextension enable --py \
+      jupyterlab_github --sys-prefix
 RUN  mkdir -p /usr/share/git && \
      cd /usr/share/git && \
      npm install -g webpack && \
-     git clone https://github.com/jupyterhub/jupyterlab-hub.git && \
+     git clone https://github.com/jupyterhub/jupyterlab-hub && \
      git clone https://github.com/lsst-sqre/jupyterlab-savequit && \
-     for i in savequit hub; do \
+     git clone https://github.com/lsst-sqre/jupyterlab-github && \
+     for i in savequit hub github; do \
      	 cd jupyterlab-${i} && \
          npm install --unsafe-perm && \
          python3 /usr/bin/jupyter labextension link . && \
