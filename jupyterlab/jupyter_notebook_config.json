@@ -1,7 +1,8 @@
 {
   "NotebookApp": {
     "nbserver_extensions": {
-      "jupyterlab": true
+      "jupyterlab": true,
+      "jupyterlab_github": true
     },
     "terminado_settings": {
       "shell_command": [ "/bin/bash", "-i" ]

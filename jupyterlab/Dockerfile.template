@@ -73,9 +73,10 @@ RUN  pdir=/opt/lsst/software/stack/python/current/bin && \
       fi
 RUN  /opt/lsst/software/stack/python/current/bin/python${PYVER} \
       -m ipykernel install --name 'LSST_Stack'
+# Remember to add these to jupyter_notebook_config.json
 RUN  python3 /usr/bin/jupyter serverextension enable --py jupyterlab \
       --sys-prefix && \
-      python3 /usr/bin/jupyter serverextension enable --py jupyterlab_github  \
+      python3 /usr/bin/jupyter serverextension enable --py jupyterlab_github \
       --sys-prefix
 RUN  /opt/lsst/software/stack/python/current/bin/python${PYVER} \
       /usr/bin/jupyter serverextension enable --py jupyterlab --sys-prefix && \
@@ -91,7 +92,7 @@ RUN  mkdir -p /usr/share/git && \
      for i in savequit hub github; do \
      	 cd jupyterlab-${i} && \
          npm install --unsafe-perm && \
-         python3 /usr/bin/jupyter labextension link . && \
+         python3 /usr/bin/jupyter labextension link . --no-build && \
          npm run build && \
          cd .. ;\
      done
@@ -137,11 +138,11 @@ RUN  cd /etc/profile.d && \
      for i in local*; do \
          ln $i $(basename $i .sh).csh ;\
      done
+COPY jupyter_notebook_config.json /usr/etc/jupyter
 RUN  mkdir -p /etc/skel/notebooks
 COPY lsst_kernel_py${PYVER}.json \
        /usr/local/share/jupyter/kernels/lsst_stack/kernel.json
 COPY motd /etc/motd
-COPY jupyter_notebook_config.json /usr/etc/jupyter
 COPY 20_jupytervars /etc/sudoers.d/
 COPY pythonrc /etc/skel/.pythonrc
 COPY lsst_kernel_py${PYVER}.json \
