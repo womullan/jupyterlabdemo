@@ -86,10 +86,11 @@ RUN  /opt/lsst/software/stack/python/current/bin/python${PYVER} \
 RUN  mkdir -p /usr/share/git && \
      cd /usr/share/git && \
      npm install -g webpack && \
-     git clone https://github.com/jupyterhub/jupyterlab-hub.git && \
+     git clone https://github.com/lsst-sqre/jupyterlab-savequit && \
      git clone https://github.com/bokeh/jupyterlab_bokeh.git && \
      mv jupyterlab_bokeh jupyterlab-bokeh && \
-     git clone https://github.com/lsst-sqre/jupyterlab-savequit && \
+     git clone https://github.com/jupyterhub/jupyterlab-hub.git && \
+     git clone https://github.com/jupyterlab/jupyterlab-github && \
      for i in savequit bokeh hub github; do \
      	 cd jupyterlab-${i} && \
          python3 /usr/bin/jupyter labextension link . --no-build && \
