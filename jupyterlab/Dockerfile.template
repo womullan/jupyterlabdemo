@@ -73,6 +73,10 @@ RUN  pdir=/opt/lsst/software/stack/python/current/bin && \
       fi
 RUN  /opt/lsst/software/stack/python/current/bin/python${PYVER} \
       -m ipykernel install --name 'LSST_Stack'
+# Override for PR testing
+RUN  cd /usr/lib/python3.4/site-packages/jupyterlab_github && \
+     rm -rf __init__.py __pycache__ && \
+     wget https://raw.githubusercontent.com/ian-r-rose/jupyterlab-github/faffb57ea7fa429e387441751e737122b1eabf3f/jupyterlab_github/__init__.py
 # Remember to add these to jupyter_notebook_config.json
 RUN  python3 /usr/bin/jupyter serverextension enable --py jupyterlab \
       --sys-prefix && \
@@ -164,6 +168,10 @@ RUN  sed -i -e \
      fi
 RUN  useradd -m -g jupyter -u 768 -c "JupyterHub User" jupyter
 RUN  rm -rf /root/.eups
+# Override for PR testing
+#RUN  cd /usr/lib/python3.4/site-packages/jupyterlab_github && \
+#     rm -f __init__.py && \
+#     wget https://raw.githubusercontent.com/ian-r-rose/jupyterlab-github/faffb57ea7fa429e387441751e737122b1eabf3f/jupyterlab_github/__init__.py
 ENV  LANG=C.UTF-8
 WORKDIR /tmp
 CMD [ "/opt/lsst/software/jupyterlab/lablauncher.bash" ]
