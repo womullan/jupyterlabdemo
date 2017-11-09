@@ -52,6 +52,7 @@ RUN  pip3 install --upgrade virtualenv virtualenvwrapper \
 RUN  pip3 install \
       https://github.com/jupyterlab/jupyterlab/zipball/master \
       https://github.com/jupyter/notebook/zipball/master \
+      https://github.com/jupyter-widgets/ipywidgets/zipball/master \      
       https://github.com/jupyterhub/jupyterhub/zipball/master
 RUN  git ls-remote https://github.com/jupyterlab/jupyterlab.git master | \
        awk '{print $1}' > /root/jupyterlab.commit
@@ -60,14 +61,14 @@ RUN  python3 /usr/bin/nbdime config-git --enable --system
 # scipy/pandas/numpy/astropy/matplotlib all already there
 RUN  source /opt/lsst/software/stack/loadLSST.bash && \
      pip install --upgrade pip \
-        setuptools \
-        virtualenvwrapper \
-        ipykernel \
-        pipenv \
-        nbdime \
-        pypandoc \
-        ipywidgets \
-        bokeh
+      setuptools \
+      virtualenvwrapper \
+      ipykernel \
+       pipenv \
+       nbdime \
+       pypandoc \
+       https://github.com/jupyter-widgets/ipywidgets/zipball/master \
+       bokeh
 ENV  PYVER={{PYVER}}
 RUN  pdir=/opt/lsst/software/stack/python/current/bin && \
      export pdir && \
