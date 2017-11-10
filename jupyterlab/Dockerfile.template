@@ -46,7 +46,6 @@ RUN  pip3 install --upgrade virtualenv virtualenvwrapper \
       pandas \
       astropy \
       pypandoc \
-      ipywidgets \
       matplotlib \
       bokeh
 RUN  pip3 install \
@@ -64,11 +63,11 @@ RUN  source /opt/lsst/software/stack/loadLSST.bash && \
       setuptools \
       virtualenvwrapper \
       ipykernel \
-       pipenv \
-       nbdime \
-       pypandoc \
-       https://github.com/jupyter-widgets/ipywidgets/zipball/master \
-       bokeh
+      pipenv \
+      nbdime \
+      pypandoc \
+      https://github.com/jupyter-widgets/ipywidgets/zipball/master \
+      bokeh
 ENV  PYVER={{PYVER}}
 RUN  pdir=/opt/lsst/software/stack/python/current/bin && \
      export pdir && \
